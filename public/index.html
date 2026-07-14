@@ -1,0 +1,167 @@
+﻿<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>МЕРОС КАССА</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar shell">
+      <div class="toolbar">
+        <a class="btn top-nav-btn" href="/inventory.html">Склад</a>
+        <a class="btn top-nav-btn" href="/journal.html">Журнал чеков</a>
+        <a class="btn top-nav-btn" href="/reports.html">Отчеты</a>
+        <a class="btn top-nav-btn" href="/debtors.html">Должники</a>
+      </div>
+    </header>
+
+    <main class="shell layout">
+      <section class="catalog panel">
+        <div class="section-head catalog-head">
+          <input id="searchInput" type="text" placeholder="Найти товар по названию" />
+        </div>
+        <div class="catalog-layout">
+          <aside class="categories">
+            <h3>Категории</h3>
+            <div id="categoryList" class="category-list"></div>
+          </aside>
+          <div id="productsList" class="products-grid"></div>
+        </div>
+      </section>
+
+      <aside class="checkout panel">
+        <div class="cart-slots">
+          <div id="cartSlots" class="cart-slots-list"></div>
+          <div class="cart-slots-actions">
+            <button id="newCartBtn" class="btn small" type="button">+ Клиент</button>
+            <button id="closeCartBtn" class="btn small" type="button">Закрыть</button>
+          </div>
+        </div>
+        <div id="cartList" class="cart-list"></div>
+        <div class="field">
+          Клиент
+          <input id="saleClientInput" type="text" placeholder="Частное лицо" />
+          <div id="saleClientResults" class="debt-client-results"></div>
+        </div>
+        <div class="field">
+          Комментарий к чеку
+          <input id="saleCommentInput" type="text" maxlength="120" placeholder="Например: Самовывоз, доставка в 18:00" />
+        </div>
+        <div class="total-row">
+          <span>Итого к оплате</span>
+          <strong id="totalValue">0 ₽</strong>
+        </div>
+        <div class="action-grid">
+          <button id="sellBtn" class="btn primary">Наличка</button>
+          <button id="cardBtn" class="btn">Перевод</button>
+          <button id="debtBtn" class="btn">В ДОЛГ</button>
+          <button id="printBtn" class="btn">ПЕЧАТЬ ЧЕК</button>
+          <button id="resetBtn" class="btn">СБРОС</button>
+        </div>
+        <label class="checkout-autoprint">
+          <input id="autoPrintToggle" type="checkbox" />
+          Автопечать чека
+        </label>
+      </aside>
+    </main>
+
+    <div id="addItemModal" class="modal hidden">
+      <div class="modal-backdrop" data-close-modal></div>
+      <div class="modal-card">
+        <h3 id="modalTitle">Добавить в чек</h3>
+        <div class="field">
+          Количество
+          <input id="modalQtyInput" type="number" min="0.001" step="0.001" value="1" />
+        </div>
+        <div class="field">
+          <span id="modalPriceLabel">Цена за шт.</span>
+          <input id="modalPriceInput" type="number" min="0.01" step="0.01" />
+        </div>
+        <div class="modal-actions">
+          <button id="modalCancelBtn" class="btn ghost">Отмена</button>
+          <button id="modalSaveBtn" class="btn primary">Добавить</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="cashModal" class="modal hidden">
+      <div class="modal-backdrop" data-close-cash-modal></div>
+      <div class="cash-card">
+        <div class="cash-head">
+          <h3>Расчет наличными</h3>
+          <button id="cashCloseBtn" class="btn small">✕</button>
+        </div>
+
+        <div class="cash-grid">
+          <div class="cash-left">
+            <div class="cash-line">
+              <span>К оплате:</span>
+              <strong id="cashTotalValue">0,00</strong>
+            </div>
+            <div class="cash-line">
+              <span>Получено:</span>
+              <input id="cashReceivedInput" type="text" value="0" />
+            </div>
+            <div class="cash-tools">
+              <button id="cashExactBtn" class="btn">Точная сумма</button>
+            </div>
+            <div class="cash-line">
+              <span>Сдача:</span>
+              <strong id="cashChangeValue">0,00</strong>
+            </div>
+          </div>
+
+          <div class="cash-pad">
+            <button class="btn pad-btn" data-pad="1">1</button>
+            <button class="btn pad-btn" data-pad="2">2</button>
+            <button class="btn pad-btn" data-pad="3">3</button>
+            <button class="btn pad-btn" data-pad="4">4</button>
+            <button class="btn pad-btn" data-pad="5">5</button>
+            <button class="btn pad-btn" data-pad="6">6</button>
+            <button class="btn pad-btn" data-pad="7">7</button>
+            <button class="btn pad-btn" data-pad="8">8</button>
+            <button class="btn pad-btn" data-pad="9">9</button>
+            <button class="btn pad-btn" data-pad="0">0</button>
+            <button class="btn pad-btn" data-pad="back">⌫</button>
+          </div>
+        </div>
+
+        <button id="cashConfirmBtn" class="btn primary cash-confirm">Подтвердить</button>
+      </div>
+    </div>
+
+    <div id="debtModal" class="modal hidden">
+      <div class="modal-backdrop" data-close-debt-modal></div>
+      <div class="modal-card">
+        <h3>Продажа в долг</h3>
+        <div class="field">
+          Поиск клиента
+          <input id="debtClientSearchInput" type="text" placeholder="Имя или телефон" />
+          <div id="debtClientResults" class="debt-client-results"></div>
+        </div>
+        <div class="field">
+          Или создать нового клиента
+          <input id="debtClientNameInput" type="text" placeholder="Имя клиента" />
+        </div>
+        <div class="field">
+          Телефон (необязательно)
+          <input id="debtClientPhoneInput" type="text" placeholder="+7 ..." />
+        </div>
+        <div class="modal-actions">
+          <button id="debtCloseBtn" class="btn" type="button">Отмена</button>
+          <button id="debtConfirmBtn" class="btn primary" type="button">Оформить в долг</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="toast" class="toast hidden"></div>
+    <script src="app.js"></script>
+  </body>
+</html>

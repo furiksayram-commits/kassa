@@ -1,0 +1,115 @@
+﻿<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Склад</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="shell printer-page">
+      <section class="panel reports-page inventory-page">
+        <div class="section-head">
+          <h2>Склад</h2>
+          <div class="inline-actions">
+            <a class="btn top-nav-btn" href="/">Касса</a>
+            <a class="btn top-nav-btn" href="/debtors.html">Должники</a>
+            <a class="btn top-nav-btn" href="/journal.html">Журнал чеков</a>
+            <a class="btn top-nav-btn" href="/reports.html">Отчеты</a>
+          </div>
+        </div>
+
+        <div class="inventory-grid">
+          <section class="report-card">
+            <h3>Добавить товар</h3>
+            <form id="addProductForm" class="inventory-form">
+              <input name="name" type="text" placeholder="Название" required />
+              <select id="addProductCategorySelect" name="category"></select>
+              <select id="addProductUnitSelect" name="unit">
+                <option value="шт">шт</option>
+                <option value="м">м</option>
+                <option value="кв">кв</option>
+                <option value="кг">кг</option>
+              </select>
+              <input name="price" type="number" min="0.01" step="0.01" placeholder="Цена" required />
+              <input name="minPrice" type="number" min="0.01" step="0.01" placeholder="Мин. цена" />
+              <button class="btn primary" type="submit">Добавить товар</button>
+            </form>
+          </section>
+
+          <section class="report-card">
+            <h3>Импорт из Excel</h3>
+            <div class="inventory-form">
+              <a class="btn" href="/api/products/template">Скачать шаблон Excel</a>
+              <input id="importFileInput" type="file" accept=".xlsx,.xls" />
+              <button id="importBtn" class="btn primary" type="button">Импортировать файл</button>
+              <p class="muted">Колонки: Название, Категория, ЕдИзм, Цена, Мин. цена</p>
+            </div>
+            <div id="importResult" class="report-box"></div>
+          </section>
+        </div>
+
+        <section class="catalog inventory-catalog">
+          <div class="section-head catalog-head">
+            <div>
+              <h3>Товары на складе</h3>
+              <span class="muted">Фильтр по категориям и поиск по названию</span>
+            </div>
+            <div class="inline-actions">
+              <input id="inventorySearchInput" type="text" placeholder="Найти товар по названию" />
+              <button id="refreshInventoryBtn" class="btn">Обновить</button>
+            </div>
+          </div>
+
+          <div class="catalog-layout inventory-catalog-layout">
+            <aside class="categories">
+              <h3>Категории</h3>
+              <div class="inventory-add-category">
+                <input id="newCategoryInput" type="text" placeholder="Новая категория" />
+                <button id="addCategoryBtn" class="btn">Добавить</button>
+              </div>
+              <div id="inventoryCategoryList" class="category-list"></div>
+              <div id="categoriesManagerList" class="category-manager-list"></div>
+            </aside>
+
+            <div id="inventoryTable" class="inventory-table"></div>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <div id="editProductModal" class="modal hidden">
+      <div class="modal-backdrop" data-close-edit-modal></div>
+      <div class="modal-card">
+        <h3>Редактировать товар</h3>
+        <form id="editProductForm" class="inventory-form">
+          <input id="editNameInput" name="name" type="text" placeholder="Название" required />
+          <select id="editCategorySelect" name="category"></select>
+          <select id="editUnitSelect" name="unit">
+            <option value="шт">шт</option>
+            <option value="м">м</option>
+            <option value="кв">кв</option>
+            <option value="кг">кг</option>
+          </select>
+          <input id="editPriceInput" name="price" type="number" min="0.01" step="0.01" placeholder="Цена" required />
+          <input id="editMinPriceInput" name="minPrice" type="number" min="0.01" step="0.01" placeholder="Мин. цена" />
+          <div class="modal-actions">
+            <button id="editCancelBtn" class="btn" type="button">Отмена</button>
+            <button class="btn primary" type="submit">Сохранить</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div id="toast" class="toast hidden"></div>
+    <script src="inventory.js"></script>
+  </body>
+</html>
+
+

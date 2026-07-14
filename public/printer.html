@@ -1,0 +1,72 @@
+﻿<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Настройки принтера</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="shell printer-page">
+      <section class="panel printer-card">
+        <div class="section-head">
+          <h2>Настройки принтера</h2>
+          <a class="btn top-nav-btn nav-btn" href="/">Назад в кассу</a>
+        </div>
+
+        <div class="field">
+          Режим печати
+          <select id="printerTransport">
+            <option value="tcp">TCP (LAN, 9100)</option>
+            <option value="com">COM (USB to COM)</option>
+          </select>
+        </div>
+
+        <div id="tcpFields" class="transport-block">
+          <div class="field">
+            IP / Host
+            <input id="printerHost" type="text" placeholder="192.168.1.50" />
+          </div>
+          <div class="field">
+            Port
+            <input id="printerPort" type="number" min="1" max="65535" />
+          </div>
+        </div>
+
+        <div id="comFields" class="transport-block">
+          <div class="field">
+            COM порт
+            <input id="printerComPort" type="text" placeholder="COM322" />
+          </div>
+          <div class="field">
+            Baud rate
+            <input id="printerComBaud" type="number" min="1200" step="1" value="9600" />
+          </div>
+        </div>
+
+        <div class="field">
+          Символов в строке
+          <input id="printerChars" type="number" min="20" max="80" />
+        </div>
+        <div class="field">
+          CodePage (обычно 17 для CP866)
+          <input id="printerCodePage" type="number" min="0" max="255" />
+        </div>
+
+        <div class="printer-actions">
+          <button id="savePrinterBtn" class="btn primary">Сохранить</button>
+          <button id="testPrinterBtn" class="btn">Тестовая печать</button>
+        </div>
+
+        <p id="printerStatus" class="muted"></p>
+      </section>
+    </main>
+    <script src="printer.js"></script>
+  </body>
+</html>

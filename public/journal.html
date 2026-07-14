@@ -1,0 +1,58 @@
+﻿<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>&#1046;&#1091;&#1088;&#1085;&#1072;&#1083; &#1095;&#1077;&#1082;&#1086;&#1074;</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="shell printer-page">
+      <section class="panel reports-page">
+        <div class="section-head">
+          <h2>&#1046;&#1091;&#1088;&#1085;&#1072;&#1083; &#1095;&#1077;&#1082;&#1086;&#1074;</h2>
+          <div class="inline-actions">
+            <a class="btn top-nav-btn" href="/reports.html">&#1054;&#1090;&#1095;&#1077;&#1090;&#1099;</a>
+            <a class="btn top-nav-btn" href="/inventory.html">&#1057;&#1082;&#1083;&#1072;&#1076;</a>
+            <a class="btn top-nav-btn" href="/debtors.html">&#1044;&#1086;&#1083;&#1078;&#1085;&#1080;&#1082;&#1080;</a>
+            <a class="btn top-nav-btn" href="/">&#1053;&#1072;&#1079;&#1072;&#1076; &#1074; &#1082;&#1072;&#1089;&#1089;&#1091;</a>
+          </div>
+        </div>
+
+        <section class="report-card">
+          <div class="section-head">
+            <h3>&#1044;&#1085;&#1077;&#1074;&#1085;&#1086;&#1081; &#1086;&#1090;&#1095;&#1077;&#1090;</h3>
+            <div class="inline-actions">
+              <input id="dailyDateInput" type="date" />
+              <button id="loadDailyBtn" class="btn">&#1055;&#1086;&#1082;&#1072;&#1079;&#1072;&#1090;&#1100;</button>
+            </div>
+          </div>
+          <div id="dailyReportBox" class="report-box"></div>
+          <div id="dailyServicesBox" class="report-box"></div>
+        </section>
+
+        <section class="journal-card">
+          <div class="section-head">
+            <h3>&#1046;&#1091;&#1088;&#1085;&#1072;&#1083; &#1095;&#1077;&#1082;&#1086;&#1074;</h3>
+            <div class="inline-actions">
+              <input id="journalDateFrom" type="date" />
+              <input id="journalDateTo" type="date" />
+              <input id="journalSaleCodeSearch" type="text" placeholder="&#1053;&#1086;&#1084;&#1077;&#1088; &#1095;&#1077;&#1082;&#1072;" />
+              <button id="refreshJournalBtn" class="btn">&#1055;&#1086;&#1082;&#1072;&#1079;&#1072;&#1090;&#1100;</button>
+            </div>
+          </div>
+          <div id="journalList" class="journal-list"></div>
+        </section>
+      </section>
+    </main>
+
+    <div id="toast" class="toast hidden"></div>
+    <script src="reports.js"></script>
+  </body>
+</html>

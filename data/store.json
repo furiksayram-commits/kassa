@@ -1,0 +1,124 @@
+{
+  "shift": {
+    "isOpen": true,
+    "openedAt": "2026-02-18T12:54:40.208Z",
+    "cashier": "Кассир 1"
+  },
+  "products": [
+    {
+      "id": "p1",
+      "sku": "1001",
+      "name": "Хлеб",
+      "price": 55,
+      "stock": 47
+    },
+    {
+      "id": "p2",
+      "sku": "1002",
+      "name": "Молоко",
+      "price": 89,
+      "stock": 38
+    },
+    {
+      "id": "p3",
+      "sku": "1003",
+      "name": "Сахар",
+      "price": 72,
+      "stock": 32
+    },
+    {
+      "id": "p4",
+      "sku": "1004",
+      "name": "Кофе",
+      "price": 320,
+      "stock": 16
+    },
+    {
+      "id": "p5",
+      "sku": "1005",
+      "name": "Чай",
+      "price": 180,
+      "stock": 24
+    }
+  ],
+  "sales": [
+    {
+      "id": "S-1771419380413",
+      "createdAt": "2026-02-18T12:56:20.413Z",
+      "cashier": "Кассир 1",
+      "paymentType": "cash",
+      "items": [
+        {
+          "productId": "p1",
+          "sku": "1001",
+          "name": "Хлеб",
+          "price": 55,
+          "qty": 2
+        }
+      ],
+      "total": 110
+    },
+    {
+      "id": "S-1771419615077",
+      "createdAt": "2026-02-18T13:00:15.077Z",
+      "cashier": "Кассир 1",
+      "paymentType": "cash",
+      "items": [
+        {
+          "productId": "p2",
+          "sku": "1002",
+          "name": "Молоко",
+          "price": 89,
+          "qty": 2
+        },
+        {
+          "productId": "p1",
+          "sku": "1001",
+          "name": "Хлеб",
+          "price": 55,
+          "qty": 1
+        }
+      ],
+      "total": 233
+    },
+    {
+      "id": "S-1771419858305",
+      "createdAt": "2026-02-18T13:04:18.305Z",
+      "cashier": "Кассир 1",
+      "paymentType": "cash",
+      "items": [
+        {
+          "productId": "p3",
+          "sku": "1003",
+          "name": "Сахар",
+          "price": 72,
+          "qty": 3
+        },
+        {
+          "productId": "p4",
+          "sku": "1004",
+          "name": "Кофе",
+          "price": 320,
+          "qty": 4
+        }
+      ],
+      "total": 1496
+    },
+    {
+      "id": "S-1771420169396",
+      "createdAt": "2026-02-18T13:09:29.396Z",
+      "cashier": "Кассир 1",
+      "paymentType": "card",
+      "items": [
+        {
+          "productId": "p5",
+          "sku": "1005",
+          "name": "Чай",
+          "price": 180,
+          "qty": 1
+        }
+      ],
+      "total": 180
+    }
+  ]
+}

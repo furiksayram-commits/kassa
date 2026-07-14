@@ -1,0 +1,96 @@
+﻿<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Должники</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="shell printer-page">
+      <section class="panel reports-page">
+        <div class="section-head">
+          <h2>Должники</h2>
+          <div class="inline-actions">
+            <a class="btn top-nav-btn" href="/">Касса</a>
+            <a class="btn top-nav-btn" href="/journal.html">Журнал чеков</a>
+            <a class="btn top-nav-btn" href="/reports.html">Отчеты</a>
+            <a class="btn top-nav-btn" href="/inventory.html">Склад</a>
+            <button id="importRemoteDebtsBtn" class="btn">Импорт из debt-tracker</button>
+            <button id="syncDebtsBtn" class="btn">Синхронизировать сейчас</button>
+          </div>
+        </div>
+
+        <div class="debtors-layout">
+          <aside class="debtors-clients panel-soft">
+            <div class="section-head">
+              <h3>Клиенты</h3>
+            </div>
+            <div class="debtors-search">
+              <input id="debtorsSearchInput" type="text" placeholder="Поиск по имени или телефону" />
+              <label class="debtors-toggle">
+                <input id="showAllClientsToggle" type="checkbox" />
+                Показать всех
+              </label>
+            </div>
+            <form id="createClientForm" class="inventory-form">
+              <input id="createClientNameInput" type="text" placeholder="Имя нового клиента" required />
+              <input id="createClientPhoneInput" type="text" placeholder="Телефон (необязательно)" />
+              <button class="btn" type="submit">Создать клиента</button>
+            </form>
+            <div id="debtorsClientsList" class="debtors-list"></div>
+          </aside>
+
+          <section class="debtors-details panel-soft">
+            <div id="debtorsSummaryBox" class="report-box"></div>
+            <div class="inline-actions">
+              <button id="clearClientDebtsBtn" class="btn danger">Удалить все долги</button>
+              <button id="fullDeleteClientBtn" class="btn danger">🗑️ Полная очистка</button>
+              <button id="resyncClientBtn" class="btn">Пересоздать в debt-tracker</button>
+            </div>
+
+            <section class="report-card">
+              <div class="section-head">
+                <h3>Погасить долг</h3>
+              </div>
+              <form id="debtPaymentForm" class="inventory-form">
+                <input id="debtAmountInput" type="number" min="0.01" step="0.01" placeholder="Сумма погашения" required />
+                <select id="debtSaleSelect">
+                  <option value="">Все долги клиента</option>
+                </select>
+                <select id="debtPaymentTypeSelect">
+                  <option value="cash">Наличные</option>
+                  <option value="card">Карта</option>
+                </select>
+                <input id="debtPaymentCommentInput" type="text" maxlength="120" placeholder="Комментарий (необязательно)" />
+                <button class="btn primary" type="submit">Погасить</button>
+              </form>
+            </section>
+
+            <section class="report-card">
+              <div class="section-head">
+                <h3>Чеки в долг</h3>
+                <button id="previewAllDebtSalesBtn" class="btn">Предпросмотр всех</button>
+              </div>
+              <div id="debtSalesList" class="journal-list"></div>
+            </section>
+
+            <section class="report-card">
+              <h3>История оплат</h3>
+              <div id="debtPaymentsList" class="journal-list"></div>
+            </section>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <div id="toast" class="toast hidden"></div>
+    <script src="debtors.js"></script>
+  </body>
+</html>
