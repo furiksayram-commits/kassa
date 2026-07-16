@@ -10,7 +10,7 @@ const sqlite3 = require("sqlite3").verbose();
 const XLSX = require("xlsx");
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3000;
 const DATA_DIR = process.env.KASSA_DATA_DIR
   ? path.resolve(process.env.KASSA_DATA_DIR)
   : path.join(__dirname, "data");
@@ -224,6 +224,25 @@ async function getAndReserveNextSaleCode() {
     );
     const maxCode = Number(maxRow?.maxCode || 0);
     next = maxCode >= 100 ? maxCode + 1 : 100;
+  }
+
+  await setSetting(key, next + 1);
+  return String(next);
+}
+
+async function getAndReserveNextStockCode() {
+  const key = "stock.nextNumber";
+  const row = await get("SELECT value FROM app_settings WHERE key = ?", [key]);
+
+  let next = Number(row?.value);
+  if (!Number.isInteger(next) || next < 1) {
+    const maxRow = await get(
+      `SELECT MAX(CAST(code AS INTEGER)) as maxCode
+       FROM stock_receipts
+       WHERE code <> '' AND code NOT GLOB '*[^0-9]*'`
+    );
+    const maxCode = Number(maxRow?.maxCode || 0);
+    next = maxCode >= 1 ? maxCode + 1 : 1;
   }
 
   await setSetting(key, next + 1);
@@ -529,6 +548,99 @@ function buildEscPosReport(report, printerConfig) {
   hr();
   align(1);
   txt(new Date().toLocaleString("ru-RU"));
+
+  cmd(0x1b, 0x64, 0x04);
+  cmd(0x1b, 0x69);
+
+  return Buffer.concat(buffers);
+}
+
+function buildEscPosStockReceipt(receipt, printerConfig) {
+  const width = printerConfig.charsPerLine;
+  const buffers = [];
+
+  const cmd = (...bytes) => buffers.push(Buffer.from(bytes));
+  const txt = (line = "") => buffers.push(iconv.encode(`${line}\n`, "cp866"));
+  const hr = () => txt("-".repeat(width));
+
+  const align = (mode) => cmd(0x1b, 0x61, mode);
+  const bold = (on) => cmd(0x1b, 0x45, on ? 1 : 0);
+  const fontSize = (value) => cmd(0x1d, 0x21, value);
+
+  const createdAt = new Date(receipt.createdAt || Date.now());
+  const docDate = createdAt.toLocaleDateString("ru-RU");
+
+  cmd(0x1b, 0x40);
+  cmd(0x1b, 0x74, printerConfig.codePage);
+  cmd(0x1b, 0x4d, 0x00);
+  fontSize(0x00);
+  bold(false);
+
+  align(1);
+  bold(true);
+  txt("МЕРОС");
+  bold(false);
+  txt("ПРИХОД ТОВАРА");
+  hr();
+
+  bold(true);
+  txt(`#${receipt.code || "-"}`);
+  bold(false);
+  txt(docDate);
+  hr();
+
+  align(0);
+
+for (const item of receipt.items) {
+    const qty = Number(item.qty || 0);
+    const qtyPrint = formatPrintQty(qty);
+    const unitPrint = normalizeUnit(item.unit || "шт");
+    const costPrice = Number(item.costPrice || 0);
+    const price = Number(item.price || 0);
+    const costLineTotal = qty * costPrice;
+    const priceLineTotal = qty * price;
+    const costPrint = formatPrintAmount(costPrice);
+    const pricePrint = formatPrintAmount(price);
+    const costTotalPrint = formatPrintAmount(costLineTotal);
+    const priceTotalPrint = formatPrintAmount(priceLineTotal);
+
+    // Format: имя товара слева, цена справа, количество + итог на следующей строке
+    const pricePart = `[${costPrint}] / ${pricePrint}`;
+    const qtyPart = `${qtyPrint}${unitPrint}`;
+    const totalPart = `= [${costTotalPrint}] / ${priceTotalPrint}`;
+
+    // Имя товара слева, цена справа
+    txt(padRight(item.name || "", width - pricePart.length) + pricePart);
+
+    // Количество слева, итог справа
+    txt(padRight(qtyPart, width - totalPart.length) + totalPart);
+    txt(""); // Empty line after each item
+  }
+
+  hr();
+  txt("");
+  bold(true);
+  fontSize(0x10);
+
+  // Финальный итог на двух строках
+  const costText = `${formatPrintAmount(receipt.totalCost)} т`;
+  const retailText = `${formatPrintAmount(receipt.totalRetail)} т`;
+
+  // Строка 1: Закуп слева
+  const buyPart = `Закуп: ${costText}`;
+  txt(buyPart);
+
+  // Строка 2: Приход справа
+  const sellPart = `Приход: ${retailText}`;
+  txt(padLeft(sellPart, width));
+
+  fontSize(0x00);
+  bold(false);
+  hr();
+  align(1);
+  bold(true);
+  txt("СПАСИБО!");
+  bold(false);
 
   cmd(0x1b, 0x64, 0x04);
   cmd(0x1b, 0x69);
@@ -1335,6 +1447,34 @@ async function initDb() {
       FOREIGN KEY (sale_id) REFERENCES sales(id)
     )
   `);
+
+  await run(`
+    CREATE TABLE IF NOT EXISTS stock_receipts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      code TEXT NOT NULL UNIQUE,
+      created_at TEXT NOT NULL,
+      cashier TEXT,
+      comment TEXT,
+      total_cost REAL NOT NULL DEFAULT 0,
+      total_retail REAL NOT NULL DEFAULT 0
+    )
+  `);
+
+  await run(`
+    CREATE TABLE IF NOT EXISTS stock_receipt_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      receipt_id INTEGER NOT NULL,
+      product_id TEXT,
+      sku TEXT,
+      name TEXT NOT NULL,
+      qty REAL NOT NULL,
+      unit TEXT NOT NULL DEFAULT 'шт',
+      cost_price REAL NOT NULL DEFAULT 0,
+      price REAL NOT NULL DEFAULT 0,
+      FOREIGN KEY (receipt_id) REFERENCES stock_receipts(id)
+    )
+  `);
+
   await run(`
     CREATE TABLE IF NOT EXISTS debt_sync_records (
       remote_record_id TEXT PRIMARY KEY,
@@ -1374,6 +1514,7 @@ async function initDb() {
   await ensureDefaultSetting("printer.codePage", DEFAULT_PRINT_CONFIG.codePage);
   await ensureDefaultSetting("reports.lastZAt", "1970-01-01T00:00:00.000Z");
   await ensureDefaultSetting("sales.nextNumber", "100");
+  await ensureDefaultSetting("stock.nextNumber", "1");
   await ensureDefaultSetting("debt.adminPin", "1234");
   await ensureDefaultSetting("debt.remoteBaseUrl", DEFAULT_REMOTE_DEBT_BASE_URL);
   await ensureDefaultSetting("debt.remoteSyncEnabled", "1");
@@ -3853,6 +3994,329 @@ app.post("/api/shifts/close", async (req, res) => {
     res.json(mapShift(updated));
   } catch (err) {
     res.status(500).json({ error: "Ошибка закрытия смены" });
+  }
+});
+
+// Stock Receipt API
+app.get("/api/stock-receipts", async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(Number(req.query.limit || 50), 1), 200);
+    const receipts = await all(
+      `SELECT id, code, created_at as createdAt, cashier, comment, 
+              total_cost as totalCost, total_retail as totalRetail
+       FROM stock_receipts
+       ORDER BY id DESC
+       LIMIT ?`,
+      [limit]
+    );
+    res.json(receipts.map(r => ({
+      id: r.id,
+      code: r.code,
+      createdAt: r.createdAt,
+      cashier: r.cashier || "",
+      comment: r.comment || "",
+      totalCost: Number(r.totalCost || 0),
+      totalRetail: Number(r.totalRetail || 0)
+    })));
+  } catch (err) {
+    res.status(500).json({ error: "Ошибка загрузки приходов" });
+  }
+});
+
+app.get("/api/stock-receipts/:code", async (req, res) => {
+  const code = String(req.params.code || "").trim();
+  if (!code) {
+    return res.status(400).json({ error: "Код прихода обязателен" });
+  }
+  try {
+    const receipt = await get(
+      `SELECT id, code, created_at as createdAt, cashier, comment,
+              total_cost as totalCost, total_retail as totalRetail
+       FROM stock_receipts
+       WHERE code = ?`,
+      [code]
+    );
+    if (!receipt) {
+      return res.status(404).json({ error: "Приход не найден" });
+    }
+    const items = await all(
+      `SELECT id, product_id as productId, sku, name, qty, unit, 
+              cost_price as costPrice, price
+       FROM stock_receipt_items
+       WHERE receipt_id = ?
+       ORDER BY id ASC`,
+      [receipt.id]
+    );
+    res.json({
+      id: receipt.id,
+      code: receipt.code,
+      createdAt: receipt.createdAt,
+      cashier: receipt.cashier || "",
+      comment: receipt.comment || "",
+      totalCost: Number(receipt.totalCost || 0),
+      totalRetail: Number(receipt.totalRetail || 0),
+      items: items.map(item => ({
+        id: item.id,
+        productId: item.productId || null,
+        sku: item.sku || "",
+        name: item.name,
+        qty: Number(item.qty || 0),
+        unit: item.unit || "шт",
+        costPrice: Number(item.costPrice || 0),
+        price: Number(item.price || 0)
+      }))
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Ошибка загрузки прихода" });
+  }
+});
+
+app.post("/api/stock-receipts", async (req, res) => {
+  const { cashier, comment, items } = req.body;
+  
+  if (!Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ error: "Добавьте товары в приход" });
+  }
+
+  try {
+    const code = await getAndReserveNextStockCode();
+    const createdAt = new Date().toISOString();
+    
+    const totalCost = items.reduce((sum, item) => sum + Number(item.qty || 0) * Number(item.costPrice || 0), 0);
+    const totalRetail = items.reduce((sum, item) => sum + Number(item.qty || 0) * Number(item.price || 0), 0);
+
+    await run("BEGIN IMMEDIATE TRANSACTION");
+
+    const receiptInsert = await run(
+      `INSERT INTO stock_receipts (code, created_at, cashier, comment, total_cost, total_retail)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [code, createdAt, cashier || "Кассир", comment || "", 
+       Number(totalCost.toFixed(2)), Number(totalRetail.toFixed(2))]
+    );
+
+    for (const item of items) {
+      let productId = item.productId;
+      let sku = item.sku;
+
+      // If new product - create it
+      if (!productId && item.isNew) {
+        const product = await get(
+          "SELECT id, sku, price, min_price as minPrice, stock FROM products WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))",
+          [item.name]
+        );
+
+        if (product) {
+          productId = product.id;
+          sku = product.sku;
+          // Update price if changed
+          const newPrice = Number(item.price.toFixed(2));
+          if (Number(product.price) !== newPrice) {
+            await run(
+              "UPDATE products SET price = ?, min_price = ?, stock = stock + ? WHERE id = ?",
+              [newPrice, newPrice, Number(item.qty), productId]
+            );
+            await run(
+              `INSERT INTO inventory_ops (created_at, product_id, sku, operation, qty_delta, old_price, new_price, comment)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+              [createdAt, productId, sku, "stock_receipt_update", Number(item.qty), 
+               Number(product.price || 0), newPrice, `Приход: ${code}`]
+            );
+          } else {
+            // Just add stock
+            await run("UPDATE products SET stock = stock + ? WHERE id = ?", [Number(item.qty), productId]);
+            await run(
+              `INSERT INTO inventory_ops (created_at, product_id, sku, operation, qty_delta, comment)
+               VALUES (?, ?, ?, ?, ?, ?)`,
+              [createdAt, productId, sku, "stock_receipt", Number(item.qty), `Приход: ${code}`]
+            );
+          }
+        } else {
+          // Create new product
+          const id = makeProductId();
+          const autoSku = makeAutoSku();
+          productId = id;
+          sku = autoSku;
+          await run(
+            `INSERT INTO products (id, sku, name, category, unit, price, min_price, stock)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, autoSku, item.name, item.category || "Без категории", 
+             item.unit || "шт", Number(item.price.toFixed(2)), 
+             Number(item.price.toFixed(2)), Number(item.qty)]
+          );
+          await run(
+            `INSERT INTO inventory_ops (created_at, product_id, sku, operation, qty_delta, new_price, comment)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [createdAt, id, autoSku, "create", Number(item.qty), 
+             Number(item.price.toFixed(2)), `Приход: ${code}`]
+          );
+        }
+
+        await run(
+          `INSERT INTO stock_receipt_items 
+           (receipt_id, product_id, sku, name, qty, unit, cost_price, price)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [receiptInsert.lastID, productId || null, sku || "", item.name, 
+           Number(item.qty.toFixed(3)), item.unit || "шт", 
+           Number(item.costPrice.toFixed(2)), Number(item.price.toFixed(2))]
+        );
+      } else if (productId) {
+        // Existing product - add stock
+        const existingProduct = await get(
+          "SELECT id, sku, price, min_price as minPrice, stock FROM products WHERE id = ?",
+          [productId]
+        );
+        
+        if (existingProduct) {
+          const skuValue = existingProduct.sku;
+          sku = skuValue;
+          const newPrice = Number(item.price.toFixed(2));
+          if (Number(existingProduct.price) !== newPrice) {
+            await run("UPDATE products SET price = ?, min_price = ?, stock = stock + ? WHERE id = ?",
+              [newPrice, newPrice, Number(item.qty), productId]);
+            await run(
+              `INSERT INTO inventory_ops (created_at, product_id, sku, operation, qty_delta, old_price, new_price, comment)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+              [createdAt, productId, skuValue, "stock_receipt_update", Number(item.qty),
+               Number(existingProduct.price || 0), newPrice, `Приход: ${code}`]
+            );
+          } else {
+            await run("UPDATE products SET stock = stock + ? WHERE id = ?", [Number(item.qty), productId]);
+            await run(
+              `INSERT INTO inventory_ops (created_at, product_id, sku, operation, qty_delta, comment)
+               VALUES (?, ?, ?, ?, ?, ?)`,
+              [createdAt, productId, skuValue, "stock_receipt", Number(item.qty), `Приход: ${code}`]
+            );
+          }
+        }
+
+        await run(
+          `INSERT INTO stock_receipt_items 
+           (receipt_id, product_id, sku, name, qty, unit, cost_price, price)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [receiptInsert.lastID, productId, sku || "", item.name,
+           Number(item.qty.toFixed(3)), item.unit || "шт",
+           Number(item.costPrice.toFixed(2)), Number(item.price.toFixed(2))]
+        );
+      }
+    }
+
+    await run("COMMIT");
+    res.status(201).json({ id: receiptInsert.lastID, code });
+  } catch (err) {
+    try {
+      await run("ROLLBACK");
+    } catch (_) {}
+    res.status(500).json({ error: "Ошибка сохранения прихода" });
+  }
+});
+
+app.post("/api/stock-receipts/:code/print", async (req, res) => {
+  const code = String(req.params.code || "").trim();
+  if (!code) {
+    return res.status(400).json({ error: "Код прихода обязателен" });
+  }
+
+  try {
+    const receipt = await get(
+      `SELECT id, code, created_at as createdAt, cashier, comment,
+              total_cost as totalCost, total_retail as totalRetail
+       FROM stock_receipts
+       WHERE code = ?`,
+      [code]
+    );
+    if (!receipt) {
+      return res.status(404).json({ error: "Приход не найден" });
+    }
+    const items = await all(
+      `SELECT name, qty, unit, cost_price as costPrice, price
+       FROM stock_receipt_items
+       WHERE receipt_id = ?
+       ORDER BY id ASC`,
+      [receipt.id]
+    );
+
+    const printReceipt = {
+      code: receipt.code,
+      createdAt: receipt.createdAt,
+      cashier: receipt.cashier || "Кассир",
+      items: items.map(item => ({
+        name: item.name,
+        qty: Number(item.qty || 0),
+        unit: item.unit || "шт",
+        costPrice: Number(item.costPrice || 0),
+        price: Number(item.price || 0)
+      })),
+      totalCost: Number(receipt.totalCost || 0),
+      totalRetail: Number(receipt.totalRetail || 0),
+      comment: receipt.comment || ""
+    };
+
+    const config = await getPrintConfig();
+    const payload = buildEscPosStockReceipt(printReceipt, config);
+    await sendToPrinter(payload, config);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: "Ошибка печати прихода" });
+  }
+});
+
+app.post("/api/stock-receipts/print-only", async (req, res) => {
+  const { cashier, items } = req.body;
+  
+  if (!Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ error: "Добавьте товары в приход" });
+  }
+
+  try {
+    const code = `TMP-${Date.now()}`;
+    const receipt = {
+      code,
+      createdAt: new Date().toISOString(),
+      cashier: cashier || "Кассир",
+      items: items.map(item => ({
+        name: item.name,
+        qty: Number(item.qty.toFixed(3)),
+        unit: item.unit || "шт",
+        costPrice: Number(item.costPrice.toFixed(2)),
+        price: Number(item.price.toFixed(2))
+      })),
+      totalCost: items.reduce((sum, item) => sum + Number(item.qty || 0) * Number(item.costPrice || 0), 0),
+      totalRetail: items.reduce((sum, item) => sum + Number(item.qty || 0) * Number(item.price || 0), 0),
+      comment: ""
+    };
+
+    const config = await getPrintConfig();
+    const payload = buildEscPosStockReceipt(receipt, config);
+    await sendToPrinter(payload, config);
+    res.json({ ok: true, code });
+  } catch (err) {
+    res.status(500).json({ error: "Ошибка печати прихода" });
+  }
+});
+
+app.delete("/api/stock-receipts/:code", async (req, res) => {
+  const code = String(req.params.code || "").trim();
+  if (!code) {
+    return res.status(400).json({ error: "Код прихода обязателен" });
+  }
+
+  try {
+    const receipt = await get("SELECT id FROM stock_receipts WHERE code = ?", [code]);
+    if (!receipt) {
+      return res.status(404).json({ error: "Приход не найден" });
+    }
+
+    await run("BEGIN IMMEDIATE TRANSACTION");
+    await run("DELETE FROM stock_receipt_items WHERE receipt_id = (SELECT id FROM stock_receipts WHERE code = ?)", [code]);
+    await run("DELETE FROM stock_receipts WHERE code = ?", [code]);
+    await run("COMMIT");
+
+    res.json({ ok: true, code });
+  } catch (err) {
+    try {
+      await run("ROLLBACK");
+    } catch (_) {}
+    res.status(500).json({ error: "Ошибка удаления прихода" });
   }
 });
 

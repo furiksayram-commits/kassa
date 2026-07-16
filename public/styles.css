@@ -557,6 +557,10 @@ button {
   z-index: 31;
 }
 
+.modal-card.wide {
+  width: min(900px, 96vw);
+}
+
 .modal-card h3 {
   margin: 0 0 16px;
   font-size: 30px;
@@ -1260,4 +1264,220 @@ button {
   .journal-head {
     grid-template-columns: 1fr;
   }
+}
+
+/* Stock Receipt Page Styles */
+.stock-receipt-page .report-card {
+  margin-bottom: 12px;
+}
+
+.stock-receipt-page .receipt-items-header,
+.stock-receipt-page .receipt-item-row {
+  display: grid;
+  grid-template-columns: minmax(200px, 1.2fr) 80px 60px 100px 100px 100px 40px;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+}
+
+.stock-receipt-page .receipt-items-header {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.stock-receipt-page .receipt-item-row {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fcfdff;
+}
+
+.stock-receipt-page .receipt-totals {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.stock-receipt-page .receipt-totals .total-row {
+  margin-top: 6px;
+}
+
+.product-search-container {
+  position: relative;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.product-search-results {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  margin-top: 4px;
+  max-height: 280px;
+  overflow-y: auto;
+  z-index: 100;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.inline-fields {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.inline-fields .field {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.search-result-item {
+  padding: 10px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--line);
+}
+
+.search-result-item:last-child {
+  border-bottom: 0;
+}
+
+.search-result-item:hover {
+  background: #f4f8ff;
+}
+
+.search-result-name {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.search-result-meta {
+  display: flex;
+  gap: 12px;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.search-result-price {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.search-no-results {
+  padding: 12px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.stock-receipt .product-select-container {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.stock-receipt .product-select-container .product-select {
+  flex: 1;
+}
+
+.stock-receipt .view-receipt-content {
+  margin: 16px 0;
+}
+
+.stock-receipt .view-item-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.stock-receipt .view-item-row:last-child {
+  border-bottom: 0;
+}
+
+.stock-receipt .view-receipt-totals {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.receipts-table {
+  display: grid;
+  gap: 8px;
+}
+
+.receipts-header,
+.receipt-row {
+  display: grid;
+  grid-template-columns: 120px 120px minmax(100px, 1fr) 120px 120px 100px;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+}
+
+.rc-comment {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.receipts-header {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.receipt-row {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.receipt-row:hover {
+  background: #f4f8ff;
+  border-color: #bfd7ff;
+}
+
+@media (max-width: 1080px) {
+  .stock-receipt-page .receipt-items-header,
+  .stock-receipt-page .receipt-item-row {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+  
+  .stock-receipt-page .receipt-items-header {
+    display: none;
+  }
+  
+  .receipts-header,
+  .receipt-row {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+  
+  .receipts-header {
+    display: none;
+  }
+}
+
+/* Stock receipt view modal - center modal for stock receipt page */
+.stock-receipt-page .modal {
+  align-items: center;
+  justify-content: center;
+}
+
+.stock-receipt-page .modal-card.wide {
+  width: min(800px, 95vw);
+  max-height: 90vh;
+}
+
+.stock-receipt-page .view-receipt-content {
+  max-height: 60vh;
+  overflow-y: auto;
 }

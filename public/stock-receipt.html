@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Приход товара</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="shell printer-page">
+      <section class="panel reports-page inventory-page stock-receipt-page">
+        <div class="section-head">
+          <h2>Приход товара</h2>
+          <div class="inline-actions">
+            <a class="btn top-nav-btn" href="/">Касса</a>
+            <a class="btn top-nav-btn" href="/inventory.html">Склад</a>
+            <a class="btn top-nav-btn active" href="/stock-receipt.html">Приход товара</a>
+            <a class="btn top-nav-btn" href="/journal.html">Журнал чеков</a>
+            <a class="btn top-nav-btn" href="/reports.html">Отчеты</a>
+          </div>
+        </div>
+
+        <div class="stock-receipt-container">
+          <!-- Форма создания прихода -->
+          <section class="report-card">
+            <h3>Новый приход</h3>
+            <form id="stockReceiptForm" class="inventory-form">
+              <div class="field">
+                <input id="receiptCommentInput" type="text" placeholder="Комментарий к приходу" maxlength="240" />
+              </div>
+              <div class="field">
+                <div class="product-search-container">
+                  <input id="productSearchInput" type="text" placeholder="Поиск товара..." autocomplete="off" />
+                  <div id="productSearchResults" class="product-search-results"></div>
+                  <button id="newProductBtn" class="btn small" type="button">+ Новый товар</button>
+                </div>
+              </div>
+              <div id="newProductFields" class="new-product-fields hidden">
+                <div class="field">
+                  <label>Название нового товара</label>
+                  <input id="newProductNameInput" type="text" placeholder="Название" />
+                </div>
+                <div class="field">
+                  <label>Категория</label>
+                  <select id="newProductCategorySelect"></select>
+                </div>
+              </div>
+              <input id="productIdInput" type="hidden" />
+              <div class="inline-fields">
+                <div class="field">
+                  <label>Кол-во</label>
+                  <input id="receiptQtyInput" type="number" min="0.001" step="0.001" value="1" required />
+                </div>
+                <div class="field">
+                  <label>Ед.</label>
+                  <select id="receiptUnitSelect">
+                    <option value="шт">шт</option>
+                    <option value="м">м</option>
+                    <option value="кв">кв</option>
+                    <option value="кг">кг</option>
+                  </select>
+                </div>
+              </div>
+              <div class="field">
+                <label>Закуп. цена</label>
+                <input id="receiptCostPriceInput" type="number" min="0.01" step="0.01" placeholder="Цена закупки" required />
+              </div>
+              <div class="field">
+                <label>Розн. цена</label>
+                <input id="receiptPriceInput" type="number" min="0.01" step="0.01" placeholder="Цена продажи" required />
+              </div>
+              <button id="addItemBtn" class="btn primary" type="button">Добавить в приход</button>
+            </form>
+          </section>
+
+          <!-- Таблица позиций прихода -->
+          <section class="report-card">
+            <h3>Позиции прихода</h3>
+            <div id="receiptItemsList" class="receipt-items-list">
+              <p class="muted">Товары не добавлены</p>
+            </div>
+          </section>
+
+          <!-- Итого и действия -->
+          <section class="report-card">
+            <div class="receipt-totals">
+              <div class="total-row">
+                <span>Закупка итого:</span>
+                <strong id="totalCostValue">0 т</strong>
+              </div>
+              <div class="total-row">
+                <span>Розница итого:</span>
+                <strong id="totalRetailValue">0 т</strong>
+              </div>
+            </div>
+            <div class="action-grid">
+              <button id="saveReceiptBtn" class="btn primary" type="button">Сохранить приход</button>
+              <button id="printReceiptBtn" class="btn" type="button">Печать прихода</button>
+            </div>
+          </section>
+        </div>
+
+        <!-- История приходов -->
+        <section class="catalog inventory-catalog">
+          <div class="section-head catalog-head">
+            <div>
+              <h3>История приходов</h3>
+              <span class="muted">Последние приходы товара</span>
+            </div>
+            <div class="inline-actions">
+              <input id="receiptSearchInput" type="text" placeholder="Поиск по накладной" />
+              <button id="refreshReceiptsBtn" class="btn">Обновить</button>
+            </div>
+          </div>
+          <div id="receiptsHistory" class="receipts-history"></div>
+        </section>
+
+        <!-- Просмотр прихода -->
+<div id="viewReceiptModal" class="modal hidden">
+          <div class="modal-backdrop" data-close-view-modal></div>
+          <div class="modal-card wide">
+            <h3>Приход <span id="viewReceiptCode"></span></h3>
+            <div id="viewReceiptContent" class="view-receipt-content"></div>
+            <div class="modal-actions">
+              <button id="viewDownloadBtn" class="btn" type="button">Скачать</button>
+              <button id="viewPrintBtn" class="btn primary" type="button">Печать</button>
+              <button id="viewCloseBtn" class="btn" type="button">Закрыть</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div id="toast" class="toast hidden"></div>
+    <script src="stock-receipt.js"></script>
+  </body>
+</html>
