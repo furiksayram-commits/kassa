@@ -9,6 +9,7 @@ const receiptQtyInput = document.getElementById("receiptQtyInput");
 const receiptUnitSelect = document.getElementById("receiptUnitSelect");
 const receiptCostPriceInput = document.getElementById("receiptCostPriceInput");
 const receiptPriceInput = document.getElementById("receiptPriceInput");
+const receiptMinPriceInput = document.getElementById("receiptMinPriceInput");
 const addItemBtn = document.getElementById("addItemBtn");
 const receiptCommentInput = document.getElementById("receiptCommentInput");
 
@@ -217,6 +218,7 @@ addItemBtn.addEventListener("click", () => {
   const unit = receiptUnitSelect.value;
   let costPrice = Number(receiptCostPriceInput.value);
   const price = Number(receiptPriceInput.value);
+  const minPrice = Number(receiptMinPriceInput.value) || price;
   
   if (!costPrice || costPrice <= 0) {
     costPrice = price;
@@ -252,6 +254,7 @@ addItemBtn.addEventListener("click", () => {
       unit,
       costPrice,
       price,
+      minPrice,
       isNew: !productId
     });
   }
@@ -286,7 +289,7 @@ function renderReceiptItems() {
         <span>Кол-во</span>
         <span>Ед.</span>
         <span>Закуп</span>
-        <span>Розн</span>
+        <span>Мин. цена</span>
         <span>Сумма</span>
         <span></span>
       </div>
@@ -296,8 +299,8 @@ function renderReceiptItems() {
           <span class="ri-qty">${formatQty(item.qty)}</span>
           <span class="ri-unit">${item.unit}</span>
           <span class="ri-cost">${formatMoney(item.costPrice)}</span>
-          <span class="ri-price">${formatMoney(item.price)}</span>
-          <span class="ri-total">${formatMoney(item.qty * item.price)}</span>
+          <span class="ri-price">${formatMoney(item.minPrice || item.price)}</span>
+          <span class="ri-total">${formatMoney(item.qty * (item.minPrice || item.price))}</span>
           <button class="btn small danger" data-remove-item="${index}">✕</button>
         </div>
       `).join("")}
@@ -313,7 +316,7 @@ function renderReceiptItems() {
   }
 
   const totalCost = state.receiptItems.reduce((sum, item) => sum + item.qty * item.costPrice, 0);
-  const totalRetail = state.receiptItems.reduce((sum, item) => sum + item.qty * item.price, 0);
+  const totalRetail = state.receiptItems.reduce((sum, item) => sum + item.qty * (item.minPrice || item.price), 0);
   totalCostValue.textContent = formatMoney(totalCost);
   totalRetailValue.textContent = formatMoney(totalRetail);
 }
@@ -334,6 +337,7 @@ async function saveReceipt() {
       unit: item.unit,
       costPrice: Number(item.costPrice.toFixed(2)),
       price: Number(item.price.toFixed(2)),
+      minPrice: item.minPrice ? Number(item.minPrice.toFixed(2)) : Number(item.price.toFixed(2)),
       isNew: item.isNew
     }))
   };
@@ -387,17 +391,18 @@ async function showPrintPreviewAndPrint() {
       unit: item.unit,
       costPrice: Number(item.costPrice.toFixed(2)),
       price: Number(item.price.toFixed(2)),
+      minPrice: item.minPrice ? Number(item.minPrice.toFixed(2)) : Number(item.price.toFixed(2)),
       isNew: item.isNew
     }))
   };
 
-  const tempReceipt = {
+const tempReceipt = {
     code: `TMP-${Date.now()}`,
     createdAt: new Date().toISOString(),
     cashier: payload.cashier,
     items: payload.items,
     totalCost: payload.items.reduce((sum, item) => sum + item.qty * item.costPrice, 0),
-    totalRetail: payload.items.reduce((sum, item) => sum + item.qty * item.price, 0),
+    totalRetail: payload.items.reduce((sum, item) => sum + item.qty * (item.minPrice || item.price), 0),
     comment: payload.comment
   };
 
@@ -523,10 +528,10 @@ const previewWindow = window.open(
     return;
   }
   
-  const itemsHtml = receipt.items.map(item => {
+const itemsHtml = receipt.items.map(item => {
     const qtyStr = formatQty(item.qty);
     const costStr = formatMoney(item.costPrice);
-    const priceStr = formatMoney(item.price);
+    const priceStr = formatMoney(item.minPrice || item.price);
     const unitStr = item.unit || "шт";
     return `<div style="margin:4px 0;"><div>${item.name}</div><div style="display:flex;justify-content:space-between;font-size:11px;"><span>${qtyStr} ${unitStr}</span><span>= ${costStr} / ${priceStr}</span></div></div>`;
   }).join("");
@@ -651,11 +656,16 @@ const commentHtml = receipt.comment ? `<div style="margin:4px 0; font-size:11px;
             applyZoom();
           });
           closeBtn.addEventListener("click", () => window.close());
-          downloadBtn.addEventListener("click", async () => {
+downloadBtn.addEventListener("click", async () => {
             if (typeof html2canvas !== "function") return;
             const receiptEl = document.querySelector(".receipt");
             const prevWidth = receiptEl.style.width;
             const prevHeight = receiptEl.style.height;
+            const prevScale = document.documentElement.style.getPropertyValue("--preview-scale");
+            // Reset scale to 1 before screenshot
+            document.documentElement.style.setProperty("--preview-scale", "1");
+            // Wait for reflow
+            await new Promise(r => setTimeout(r, 50));
             receiptEl.style.width = receiptEl.scrollWidth + "px";
             receiptEl.style.height = receiptEl.scrollHeight + "px";
             const canvas = await html2canvas(receiptEl, {
@@ -666,6 +676,7 @@ const commentHtml = receipt.comment ? `<div style="margin:4px 0; font-size:11px;
             });
             receiptEl.style.width = prevWidth;
             receiptEl.style.height = prevHeight;
+            document.documentElement.style.setProperty("--preview-scale", prevScale);
             const link = document.createElement("a");
             link.download = "Приход-" + sale.code + ".jpeg";
             link.href = canvas.toDataURL("image/jpeg", 0.95);

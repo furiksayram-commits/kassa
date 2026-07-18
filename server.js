@@ -10,7 +10,7 @@ const sqlite3 = require("sqlite3").verbose();
 const XLSX = require("xlsx");
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 const DATA_DIR = process.env.KASSA_DATA_DIR
   ? path.resolve(process.env.KASSA_DATA_DIR)
   : path.join(__dirname, "data");
@@ -597,10 +597,11 @@ for (const item of receipt.items) {
     const unitPrint = normalizeUnit(item.unit || "шт");
     const costPrice = Number(item.costPrice || 0);
     const price = Number(item.price || 0);
+    const minPrice = item.minPrice ? Number(item.minPrice) : Number(item.price || 0);
     const costLineTotal = qty * costPrice;
-    const priceLineTotal = qty * price;
+    const priceLineTotal = qty * minPrice;
     const costPrint = formatPrintAmount(costPrice);
-    const pricePrint = formatPrintAmount(price);
+    const pricePrint = formatPrintAmount(minPrice);
     const costTotalPrint = formatPrintAmount(costLineTotal);
     const priceTotalPrint = formatPrintAmount(priceLineTotal);
 
@@ -1471,6 +1472,7 @@ async function initDb() {
       unit TEXT NOT NULL DEFAULT 'шт',
       cost_price REAL NOT NULL DEFAULT 0,
       price REAL NOT NULL DEFAULT 0,
+      min_price REAL NOT NULL DEFAULT 0,
       FOREIGN KEY (receipt_id) REFERENCES stock_receipts(id)
     )
   `);
@@ -1541,6 +1543,12 @@ async function initDb() {
     await run("ALTER TABLE sale_items ADD COLUMN unit TEXT NOT NULL DEFAULT 'шт'");
   }
   await run("UPDATE sale_items SET unit = 'шт' WHERE unit IS NULL OR TRIM(unit) = ''");
+
+  const receiptItemColumns = await all("PRAGMA table_info(stock_receipt_items)");
+  const hasReceiptItemMinPrice = receiptItemColumns.some((c) => c.name === "min_price");
+  if (!hasReceiptItemMinPrice) {
+    await run("ALTER TABLE stock_receipt_items ADD COLUMN min_price REAL NOT NULL DEFAULT 0");
+  }
 
   const salesColumns = await all("PRAGMA table_info(sales)");
   const hasSalesComment = salesColumns.some((c) => c.name === "comment");
@@ -4041,7 +4049,7 @@ app.get("/api/stock-receipts/:code", async (req, res) => {
     }
     const items = await all(
       `SELECT id, product_id as productId, sku, name, qty, unit, 
-              cost_price as costPrice, price
+              cost_price as costPrice, price, min_price as minPrice
        FROM stock_receipt_items
        WHERE receipt_id = ?
        ORDER BY id ASC`,
@@ -4063,7 +4071,8 @@ app.get("/api/stock-receipts/:code", async (req, res) => {
         qty: Number(item.qty || 0),
         unit: item.unit || "шт",
         costPrice: Number(item.costPrice || 0),
-        price: Number(item.price || 0)
+        price: Number(item.price || 0),
+        minPrice: Number(item.minPrice || 0)
       }))
     });
   } catch (err) {
@@ -4110,16 +4119,26 @@ app.post("/api/stock-receipts", async (req, res) => {
           sku = product.sku;
           // Update price if changed
           const newPrice = Number(item.price.toFixed(2));
+          const newMinPrice = Number(item.minPrice || item.price || 0);
           if (Number(product.price) !== newPrice) {
             await run(
               "UPDATE products SET price = ?, min_price = ?, stock = stock + ? WHERE id = ?",
-              [newPrice, newPrice, Number(item.qty), productId]
+              [newPrice, newMinPrice || newPrice, Number(item.qty), productId]
             );
             await run(
               `INSERT INTO inventory_ops (created_at, product_id, sku, operation, qty_delta, old_price, new_price, comment)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
               [createdAt, productId, sku, "stock_receipt_update", Number(item.qty), 
                Number(product.price || 0), newPrice, `Приход: ${code}`]
+            );
+          } else if (Number(product.minPrice || 0) !== Number(newMinPrice)) {
+            // Update just min_price
+            await run("UPDATE products SET min_price = ?, stock = stock + ? WHERE id = ?",
+              [newMinPrice, Number(item.qty), productId]);
+            await run(
+              `INSERT INTO inventory_ops (created_at, product_id, sku, operation, qty_delta, comment)
+               VALUES (?, ?, ?, ?, ?, ?)`,
+              [createdAt, productId, sku, "stock_receipt", Number(item.qty), `Приход: ${code}`]
             );
           } else {
             // Just add stock
@@ -4136,12 +4155,13 @@ app.post("/api/stock-receipts", async (req, res) => {
           const autoSku = makeAutoSku();
           productId = id;
           sku = autoSku;
+          const newMinPrice = Number(item.minPrice || item.price || 0);
           await run(
             `INSERT INTO products (id, sku, name, category, unit, price, min_price, stock)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
             [id, autoSku, item.name, item.category || "Без категории", 
              item.unit || "шт", Number(item.price.toFixed(2)), 
-             Number(item.price.toFixed(2)), Number(item.qty)]
+             newMinPrice || Number(item.price.toFixed(2)), Number(item.qty)]
           );
           await run(
             `INSERT INTO inventory_ops (created_at, product_id, sku, operation, qty_delta, new_price, comment)
@@ -4153,11 +4173,12 @@ app.post("/api/stock-receipts", async (req, res) => {
 
         await run(
           `INSERT INTO stock_receipt_items 
-           (receipt_id, product_id, sku, name, qty, unit, cost_price, price)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+           (receipt_id, product_id, sku, name, qty, unit, cost_price, price, min_price)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [receiptInsert.lastID, productId || null, sku || "", item.name, 
            Number(item.qty.toFixed(3)), item.unit || "шт", 
-           Number(item.costPrice.toFixed(2)), Number(item.price.toFixed(2))]
+           Number(item.costPrice.toFixed(2)), Number(item.price.toFixed(2)),
+           Number(item.minPrice || 0)]
         );
       } else if (productId) {
         // Existing product - add stock
@@ -4170,14 +4191,24 @@ app.post("/api/stock-receipts", async (req, res) => {
           const skuValue = existingProduct.sku;
           sku = skuValue;
           const newPrice = Number(item.price.toFixed(2));
+          const newMinPrice = Number(item.minPrice || item.price || 0);
           if (Number(existingProduct.price) !== newPrice) {
             await run("UPDATE products SET price = ?, min_price = ?, stock = stock + ? WHERE id = ?",
-              [newPrice, newPrice, Number(item.qty), productId]);
+              [newPrice, newMinPrice || newPrice, Number(item.qty), productId]);
             await run(
               `INSERT INTO inventory_ops (created_at, product_id, sku, operation, qty_delta, old_price, new_price, comment)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
               [createdAt, productId, skuValue, "stock_receipt_update", Number(item.qty),
                Number(existingProduct.price || 0), newPrice, `Приход: ${code}`]
+            );
+          } else if (Number(existingProduct.minPrice || 0) !== Number(newMinPrice)) {
+            // Update just min_price
+            await run("UPDATE products SET min_price = ?, stock = stock + ? WHERE id = ?",
+              [newMinPrice, Number(item.qty), productId]);
+            await run(
+              `INSERT INTO inventory_ops (created_at, product_id, sku, operation, qty_delta, comment)
+               VALUES (?, ?, ?, ?, ?, ?)`,
+              [createdAt, productId, skuValue, "stock_receipt", Number(item.qty), `Приход: ${code}`]
             );
           } else {
             await run("UPDATE products SET stock = stock + ? WHERE id = ?", [Number(item.qty), productId]);
@@ -4191,11 +4222,12 @@ app.post("/api/stock-receipts", async (req, res) => {
 
         await run(
           `INSERT INTO stock_receipt_items 
-           (receipt_id, product_id, sku, name, qty, unit, cost_price, price)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+           (receipt_id, product_id, sku, name, qty, unit, cost_price, price, min_price)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [receiptInsert.lastID, productId, sku || "", item.name,
            Number(item.qty.toFixed(3)), item.unit || "шт",
-           Number(item.costPrice.toFixed(2)), Number(item.price.toFixed(2))]
+           Number(item.costPrice.toFixed(2)), Number(item.price.toFixed(2)),
+           Number(item.minPrice || 0)]
         );
       }
     }
@@ -4228,7 +4260,7 @@ app.post("/api/stock-receipts/:code/print", async (req, res) => {
       return res.status(404).json({ error: "Приход не найден" });
     }
     const items = await all(
-      `SELECT name, qty, unit, cost_price as costPrice, price
+      `SELECT name, qty, unit, cost_price as costPrice, price, min_price as minPrice
        FROM stock_receipt_items
        WHERE receipt_id = ?
        ORDER BY id ASC`,
@@ -4244,7 +4276,8 @@ app.post("/api/stock-receipts/:code/print", async (req, res) => {
         qty: Number(item.qty || 0),
         unit: item.unit || "шт",
         costPrice: Number(item.costPrice || 0),
-        price: Number(item.price || 0)
+        price: Number(item.price || 0),
+        minPrice: item.minPrice ? Number(item.minPrice) : Number(item.price || 0)
       })),
       totalCost: Number(receipt.totalCost || 0),
       totalRetail: Number(receipt.totalRetail || 0),
@@ -4278,10 +4311,11 @@ app.post("/api/stock-receipts/print-only", async (req, res) => {
         qty: Number(item.qty.toFixed(3)),
         unit: item.unit || "шт",
         costPrice: Number(item.costPrice.toFixed(2)),
-        price: Number(item.price.toFixed(2))
+        price: Number(item.price.toFixed(2)),
+        minPrice: item.minPrice ? Number(item.minPrice) : Number(item.price.toFixed(2))
       })),
       totalCost: items.reduce((sum, item) => sum + Number(item.qty || 0) * Number(item.costPrice || 0), 0),
-      totalRetail: items.reduce((sum, item) => sum + Number(item.qty || 0) * Number(item.price || 0), 0),
+      totalRetail: items.reduce((sum, item) => sum + Number(item.qty || 0) * (item.minPrice ? Number(item.minPrice) : Number(item.price)), 0),
       comment: ""
     };
 

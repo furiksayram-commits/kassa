@@ -71,11 +71,15 @@
                 <label>Закуп. цена</label>
                 <input id="receiptCostPriceInput" type="number" min="0.01" step="0.01" placeholder="Цена закупки" required />
               </div>
-              <div class="field">
-                <label>Розн. цена</label>
-                <input id="receiptPriceInput" type="number" min="0.01" step="0.01" placeholder="Цена продажи" required />
-              </div>
-              <button id="addItemBtn" class="btn primary" type="button">Добавить в приход</button>
+               <div class="field">
+                 <label>Розн. цена</label>
+                 <input id="receiptPriceInput" type="number" min="0.01" step="0.01" placeholder="Цена продажи" required />
+               </div>
+               <div class="field">
+                 <label>Мин. цена</label>
+                 <input id="receiptMinPriceInput" type="number" min="0.01" step="0.01" placeholder="Мин. цена продажи (по умолчанию = розн. цене)" />
+               </div>
+               <button id="addItemBtn" class="btn primary" type="button">Добавить в приход</button>
             </form>
           </section>
 
