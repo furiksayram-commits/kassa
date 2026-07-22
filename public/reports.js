@@ -15,6 +15,7 @@ const shiftStateBadge = document.getElementById("shiftStateBadge");
 const journalDateFrom = document.getElementById("journalDateFrom");
 const journalDateTo = document.getElementById("journalDateTo");
 const journalSaleCodeSearch = document.getElementById("journalSaleCodeSearch");
+const journalDeliverySearch = document.getElementById("journalDeliverySearch");
 const monthlyMonthInput = document.getElementById("monthlyMonthInput");
 const loadMonthlyBtn = document.getElementById("loadMonthlyBtn");
 const monthlyReportBox = document.getElementById("monthlyReportBox");
@@ -755,11 +756,19 @@ async function loadJournal() {
   const from = journalDateFrom?.value ? new Date(`${journalDateFrom.value}T00:00:00`) : null;
   const to = journalDateTo?.value ? new Date(`${journalDateTo.value}T23:59:59.999`) : null;
   const codeFilter = saleCodeSearch.toLowerCase();
+  const deliveryFilter = String(journalDeliverySearch?.value || "").trim().toLowerCase();
   const filtered = list.filter((sale) => {
     const dt = new Date(sale.createdAt);
     if (from && dt < from) return false;
     if (to && dt > to) return false;
     if (codeFilter && !String(sale.id || "").toLowerCase().includes(codeFilter)) return false;
+    if (deliveryFilter) {
+      const hasDelivery = (sale.items || []).some((item) => {
+        const name = String(item.name || "").toLowerCase();
+        return name.includes(deliveryFilter);
+      });
+      if (!hasDelivery) return false;
+    }
     return true;
   });
 
@@ -1157,6 +1166,12 @@ journalSaleCodeSearch?.addEventListener("keydown", (event) => {
   event.preventDefault();
   loadJournal().catch((e) => showToast(e.message));
 });
+journalDeliverySearch?.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter") return;
+  event.preventDefault();
+  loadJournal().catch((e) => showToast(e.message));
+});
+journalDeliverySearch?.addEventListener("input", () => loadJournal().catch((e) => showToast(e.message)));
 closeZBtn?.addEventListener("click", closeZReport);
 printXBtn?.addEventListener("click", printXReport);
 printZBtn?.addEventListener("click", printLastZReport);

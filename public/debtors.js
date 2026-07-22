@@ -1010,19 +1010,27 @@ function openReceiptPreviewWindow(sales, summary = null) {
                 receipt.style.width = receiptCol.scrollWidth + "px";
                 receipt.style.height = receiptCol.scrollHeight + "px";
                 await new Promise((r) => requestAnimationFrame(r));
+
+                // Фиксированная ширина 800px — чтобы WhatsApp всегда показывал чек одинаково
+                const TARGET_WIDTH = 800;
+                const sourceWidth = receipt.scrollWidth;
+                const sourceHeight = receipt.scrollHeight;
+                const ratio = TARGET_WIDTH / sourceWidth;
+                const targetHeight = Math.round(sourceHeight * ratio);
+
                 const canvas = await html2canvas(receipt, {
-                  scale: 2,
+                  scale: 1,
                   backgroundColor: "#ffffff",
-                  width: receipt.scrollWidth,
-                  height: receipt.scrollHeight,
-                  windowWidth: receipt.scrollWidth,
-                  windowHeight: receipt.scrollHeight
+                  width: TARGET_WIDTH,
+                  height: targetHeight,
+                  windowWidth: TARGET_WIDTH,
+                  windowHeight: targetHeight
                 });
                 receiptCol.style.transform = prevTransform;
                 receiptCol.style.transformOrigin = prevOrigin;
                 receipt.style.width = prevWidth;
                 receipt.style.height = prevHeight;
-                const dataUrl = canvas.toDataURL("image/jpeg", 0.95);
+                const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
                 const pad2 = (v) => String(v).padStart(2, "0");
                 const stamp = new Date();
                 const datePart =
@@ -1418,3 +1426,13 @@ document.addEventListener("visibilitychange", () => {
     triggerDebtSyncRetry({ notify: true });
   }
 });
+
+const TARGET_WIDTH = 800;
+const ratio = TARGET_WIDTH / sourceWidth;
+const targetHeight = Math.round(sourceHeight * ratio);
+
+html2canvas(receipt, {
+  scale: 1,                          // нормальный масштаб
+  width: TARGET_WIDTH,               // всегда 800px
+  height: targetHeight,              // пропорционально
+})

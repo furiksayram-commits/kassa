@@ -1510,8 +1510,25 @@ function openReceiptPreviewWindow(sale) {
                 throw new Error("html2canvas не загружен");
               }
               const receipt = document.querySelector(".receipt");
-              const canvas = await html2canvas(receipt, { scale: 2, backgroundColor: "#ffffff" });
-              const dataUrl = canvas.toDataURL("image/jpeg", 0.95);
+               const prevWidth = receipt.style.width;
+               const prevHeight = receipt.style.height;
+               const prevScale = document.documentElement.style.getPropertyValue("--preview-scale");
+               // Reset scale to 1 before screenshot
+               document.documentElement.style.setProperty("--preview-scale", "1");
+               // Wait for reflow
+               await new Promise(r => setTimeout(r, 50));
+               receipt.style.width = receipt.scrollWidth + "px";
+               receipt.style.height = receipt.scrollHeight + "px";
+               const canvas = await html2canvas(receipt, {
+                 scale: 2,
+                 backgroundColor: "#ffffff",
+                 width: receipt.scrollWidth,
+                 height: receipt.scrollHeight
+               });
+               receipt.style.width = prevWidth;
+               receipt.style.height = prevHeight;
+               document.documentElement.style.setProperty("--preview-scale", prevScale);
+               const dataUrl = canvas.toDataURL("image/jpeg", 0.95);
               const pad2 = (v) => String(v).padStart(2, "0");
               const stamp = new Date(sale.createdAt || Date.now());
               const datePart = stamp.getFullYear() + "-" + pad2(stamp.getMonth() + 1) + "-" + pad2(stamp.getDate());
