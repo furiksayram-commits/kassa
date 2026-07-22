@@ -532,8 +532,13 @@ const itemsHtml = receipt.items.map(item => {
     const qtyStr = formatQty(item.qty);
     const costStr = formatMoney(item.costPrice);
     const priceStr = formatMoney(item.minPrice || item.price);
+    const costTotalStr = formatMoney(item.qty * item.costPrice);
+    const priceTotalStr = formatMoney(item.qty * (item.minPrice || item.price));
     const unitStr = item.unit || "шт";
-    return `<div style="margin:4px 0;"><div>${item.name}</div><div style="display:flex;justify-content:space-between;font-size:11px;"><span>${qtyStr} ${unitStr}</span><span>= ${costStr} / ${priceStr}</span></div></div>`;
+    return `<div style="margin:4px 0;">
+<div style="display:flex;justify-content:space-between;"><span>${item.name}</span><span>[${costStr}] / ${priceStr}</span></div>
+<div style="display:flex;justify-content:space-between;font-size:11px;"><span>${qtyStr}${unitStr}</span><span>= [${costTotalStr}] / ${priceTotalStr}</span></div>
+</div>`;
   }).join("");
   
   const totalCostStr = formatMoney(receipt.totalCost);

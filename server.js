@@ -4092,7 +4092,7 @@ app.post("/api/stock-receipts", async (req, res) => {
     const createdAt = new Date().toISOString();
     
     const totalCost = items.reduce((sum, item) => sum + Number(item.qty || 0) * Number(item.costPrice || 0), 0);
-    const totalRetail = items.reduce((sum, item) => sum + Number(item.qty || 0) * Number(item.price || 0), 0);
+    const totalRetail = items.reduce((sum, item) => sum + Number(item.qty || 0) * Number(item.minPrice || item.price || 0), 0);
 
     await run("BEGIN IMMEDIATE TRANSACTION");
 
@@ -4267,20 +4267,22 @@ app.post("/api/stock-receipts/:code/print", async (req, res) => {
       [receipt.id]
     );
 
+    const printItems = items.map(item => ({
+      name: item.name,
+      qty: Number(item.qty || 0),
+      unit: item.unit || "шт",
+      costPrice: Number(item.costPrice || 0),
+      price: Number(item.price || 0),
+      minPrice: item.minPrice ? Number(item.minPrice) : Number(item.price || 0)
+    }));
+
     const printReceipt = {
       code: receipt.code,
       createdAt: receipt.createdAt,
       cashier: receipt.cashier || "Кассир",
-      items: items.map(item => ({
-        name: item.name,
-        qty: Number(item.qty || 0),
-        unit: item.unit || "шт",
-        costPrice: Number(item.costPrice || 0),
-        price: Number(item.price || 0),
-        minPrice: item.minPrice ? Number(item.minPrice) : Number(item.price || 0)
-      })),
-      totalCost: Number(receipt.totalCost || 0),
-      totalRetail: Number(receipt.totalRetail || 0),
+      items: printItems,
+      totalCost: printItems.reduce((sum, it) => sum + it.qty * it.costPrice, 0),
+      totalRetail: printItems.reduce((sum, it) => sum + it.qty * it.minPrice, 0),
       comment: receipt.comment || ""
     };
 
