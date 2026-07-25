@@ -998,38 +998,31 @@ function openReceiptPreviewWindow(sales, summary = null) {
                 if (typeof html2canvas !== "function") {
                   throw new Error("html2canvas не загружен");
                 }
-                const receipt = document.querySelector(".receipt-export");
-                const receiptCol = receipt?.querySelector(".receipt-col");
-                if (!receipt || !receiptCol) throw new Error("Не найден блок чека");
-                const prevTransform = receiptCol.style.transform;
-                const prevOrigin = receiptCol.style.transformOrigin;
-                const prevWidth = receipt.style.width;
-                const prevHeight = receipt.style.height;
-                receiptCol.style.transform = "none";
-                receiptCol.style.transformOrigin = "top left";
-                receipt.style.width = receiptCol.scrollWidth + "px";
-                receipt.style.height = receiptCol.scrollHeight + "px";
                 await new Promise((r) => requestAnimationFrame(r));
 
-                // Фиксированная ширина 800px — чтобы WhatsApp всегда показывал чек одинаково
-                const TARGET_WIDTH = 800;
-                const sourceWidth = receipt.scrollWidth;
-                const sourceHeight = receipt.scrollHeight;
-                const ratio = TARGET_WIDTH / sourceWidth;
-                const targetHeight = Math.round(sourceHeight * ratio);
+                const receiptExport = document.querySelector(".receipt-export");
+                const receiptCol = receiptExport?.querySelector(".receipt-col");
 
-                const canvas = await html2canvas(receipt, {
-                  scale: 1,
+              if (!receiptExport || !receiptCol) {
+              throw new Error("Не найден блок чека");
+              }
+
+              const prevTransform = receiptCol.style.transform;
+              const prevOrigin = receiptCol.style.transformOrigin;
+
+              receiptCol.style.transform = "none";
+              receiptCol.style.transformOrigin = "top left";
+
+              const rect = receiptCol.getBoundingClientRect();
+
+              receiptExport.style.width = Math.ceil(rect.width) + "px";
+              receiptExport.style.height = Math.ceil(rect.height) + "px";
+                const canvas = await html2canvas(receiptExport, {
+                  scale: 2,
                   backgroundColor: "#ffffff",
-                  width: TARGET_WIDTH,
-                  height: targetHeight,
-                  windowWidth: TARGET_WIDTH,
-                  windowHeight: targetHeight
                 });
                 receiptCol.style.transform = prevTransform;
                 receiptCol.style.transformOrigin = prevOrigin;
-                receipt.style.width = prevWidth;
-                receipt.style.height = prevHeight;
                 const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
                 const pad2 = (v) => String(v).padStart(2, "0");
                 const stamp = new Date();
@@ -1427,12 +1420,3 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 
-const TARGET_WIDTH = 800;
-const ratio = TARGET_WIDTH / sourceWidth;
-const targetHeight = Math.round(sourceHeight * ratio);
-
-html2canvas(receipt, {
-  scale: 1,                          // нормальный масштаб
-  width: TARGET_WIDTH,               // всегда 800px
-  height: targetHeight,              // пропорционально
-})
