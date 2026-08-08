@@ -827,13 +827,54 @@ function parseImportRowsFromWorkbook(workbook) {
   return XLSX.utils.sheet_to_json(worksheet, { defval: "" });
 }
 
-const FIXED_REPORT_SERVICE_ITEMS = [
-  { label: "Доставка", aliases: ["доставка"] },
-  { label: "Доставка 191", aliases: ["доставка 191"] },
-  { label: "Доставка 233", aliases: ["доставка 233"] },
-  { label: "Доставка 853", aliases: ["доставка 853"] },
-  { label: "Резка", aliases: ["резка", "резка металла"] }
-];
+const SERVICE_CATEGORIES = new Set(["доставка", "резка"]);
+
+// ===== ДОСТАВКА: координаты магазина и расчет =====
+const STORE_LOCATION = {
+  lat: 42.311041,
+  lon: 69.78032
+};
+
+/**
+ * Расчет расстояния между двумя точками по формуле Haversine
+ */
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+function distanceFromStore(lat, lon) {
+  return calculateDistance(STORE_LOCATION.lat, STORE_LOCATION.lon, lat, lon);
+}
+
+/**
+ * Расчет стоимости доставки на основе расстояния
+ */
+function calculateDeliveryCost(distance) {
+  if (distance < 2) return 1000;
+  if (distance >= 2 && distance < 2.5) return 1500;
+  if (distance >= 2.5 && distance < 3) return 2000;
+  if (distance >= 3 && distance < 4) return 3000;
+  if (distance >= 4 && distance < 5) return 4000;
+  if (distance >= 5 && distance < 10) return 5000;
+  if (distance >= 10 && distance < 13) return 6000;
+  if (distance >= 13 && distance < 15) return 7000;
+  if (distance >= 15 && distance < 20) return 8000;
+  return Math.ceil((distance * 400) / 100) * 100;
+}
+
+function getDeliveryInfo(lat, lon) {
+  const distance = distanceFromStore(lat, lon);
+  const cost = calculateDeliveryCost(distance);
+  return { distance, cost };
+}
 
 function normalizeReportName(value) {
   return String(value || "")
@@ -843,31 +884,38 @@ function normalizeReportName(value) {
 }
 
 function buildFixedServiceItems(rows) {
-  const byName = new Map();
+  // Collect all items that belong to service categories (Доставка, Резка)
+  const serviceItems = [];
+  const seen = new Set();
+
   for (const row of rows) {
-    const key = normalizeReportName(row.name);
-    if (!key) continue;
-    const prev = byName.get(key) || { qty: 0, amount: 0 };
-    prev.qty += Number(row.qtyTotal || 0);
-    prev.amount += Number(row.amountTotal || 0);
-    byName.set(key, prev);
+    const category = normalizeReportName(row.category || "");
+    if (!category || !SERVICE_CATEGORIES.has(category)) continue;
+
+    const name = row.name || "";
+    const key = normalizeReportName(name);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+
+    serviceItems.push({
+      name: name,
+      qty: Number(row.qtyTotal || 0),
+      amount: Number(row.amountTotal || 0)
+    });
   }
 
-  return FIXED_REPORT_SERVICE_ITEMS.map((service) => {
-    let qty = 0;
-    let amount = 0;
-    service.aliases.forEach((alias) => {
-      const found = byName.get(alias);
-      if (!found) return;
-      qty += Number(found.qty || 0);
-      amount += Number(found.amount || 0);
-    });
-    return {
-      name: service.label,
-      qty,
-      amount
-    };
+  // Sort: Доставка items first, then Резка
+  serviceItems.sort((a, b) => {
+    const aCat = normalizeReportName(a.name);
+    const bCat = normalizeReportName(b.name);
+    const aIsDelivery = aCat.includes("доставка");
+    const bIsDelivery = bCat.includes("доставка");
+    if (aIsDelivery && !bIsDelivery) return -1;
+    if (!aIsDelivery && bIsDelivery) return 1;
+    return a.name.localeCompare(b.name, "ru");
   });
+
+  return serviceItems;
 }
 
 function normalizeClientName(value) {
@@ -1720,6 +1768,36 @@ app.post("/api/print/test", async (req, res) => {
   } catch (err) {
     res.status(400).json({ error: err.message || "Ошибка печати чека" });
   }
+});
+
+// ===== ДОСТАВКА: API =====
+app.post("/api/delivery/calculate", (req, res) => {
+  try {
+    const { lat, lon, routeDistance } = req.body;
+    if (lat === undefined || lon === undefined) {
+      return res.status(400).json({ error: "lat and lon are required" });
+    }
+    let distance, cost;
+    if (routeDistance !== undefined && routeDistance !== null) {
+      distance = parseFloat(routeDistance);
+      cost = calculateDeliveryCost(distance);
+    } else {
+      const info = getDeliveryInfo(parseFloat(lat), parseFloat(lon));
+      distance = info.distance;
+      cost = info.cost;
+    }
+    res.json({ distance, cost });
+  } catch (err) {
+    res.status(500).json({ error: err.message || "Ошибка расчета доставки" });
+  }
+});
+
+app.get("/api/delivery/store", (req, res) => {
+  res.json({
+    name: "МЕРОС Строймаркет",
+    address: "Шымкент, ул. С. Сатыбалдиева, 43/1",
+    location: STORE_LOCATION
+  });
 });
 
 app.get("/api/products", async (req, res) => {
@@ -3143,10 +3221,12 @@ app.get("/api/reports/monthly", async (req, res) => {
     const itemsAgg = await all(
       `SELECT
          si.name,
+         COALESCE(p.category, '') as category,
          COALESCE(SUM(si.qty), 0) as qtyTotal,
          COALESCE(SUM(si.qty * si.price), 0) as amountTotal
        FROM sale_items si
        INNER JOIN sales s ON s.id = si.sale_id
+       LEFT JOIN products p ON p.id = si.product_id
        WHERE s.created_at >= ? AND s.created_at < ?
        GROUP BY si.name`,
       [periodStart, periodEnd]
@@ -3259,10 +3339,12 @@ app.get("/api/reports/daily", async (req, res) => {
     const itemsAgg = await all(
       `SELECT
          si.name,
+         COALESCE(p.category, '') as category,
          COALESCE(SUM(si.qty), 0) as qtyTotal,
          COALESCE(SUM(si.qty * si.price), 0) as amountTotal
        FROM sale_items si
        INNER JOIN sales s ON s.id = si.sale_id
+       LEFT JOIN products p ON p.id = si.product_id
        WHERE s.created_at >= ? AND s.created_at < ?
        GROUP BY si.name`,
       [periodStart, periodEnd]

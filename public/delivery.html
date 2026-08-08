@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Расчет доставки - МЕРОС</title>
+  <script src="https://api-maps.yandex.ru/2.1/?apikey=ec23a9ed-deb7-4280-b105-1c8ae9e7543f&lang=ru_RU" type="text/javascript"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .delivery-page { display: flex; gap: 20px; height: calc(100vh - 100px); }
+    .delivery-info { width: 380px; min-width: 380px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
+    .store-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 24px; border-radius: 16px; text-align: center; box-shadow: 0 8px 24px rgba(102,126,234,0.3); }
+    .store-card h2 { font-size: 20px; margin-bottom: 12px; }
+    .store-card p { font-size: 14px; opacity: 0.9; margin-bottom: 6px; }
+    .delivery-card { background: var(--panel); border-radius: 16px; padding: 24px; box-shadow: 0 4px 16px rgba(0,0,0,0.06); }
+    .delivery-card h3 { font-size: 18px; margin-bottom: 20px; color: var(--accent); }
+    .input-group { margin-bottom: 16px; }
+    .input-group label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+    .address-input-wrapper { position: relative; margin-bottom: 10px; }
+    #address-input { width: 100%; padding: 12px 16px; border: 2px solid var(--line); border-radius: 10px; font-size: 15px; outline: none; background: white; }
+    #address-input:focus { border-color: var(--accent); }
+    .suggestions { display: none; position: absolute; top: 100%; left: 0; right: 0; background: white; border: 2px solid var(--line); border-top: none; border-radius: 0 0 10px 10px; max-height: 250px; overflow-y: auto; z-index: 100; box-shadow: 0 8px 24px rgba(0,0,0,0.12); }
+    .suggestion-item { padding: 10px 14px; cursor: pointer; border-bottom: 1px solid #f3f4f6; }
+    .suggestion-item:hover { background: #f0f4ff; }
+    .suggestion-title { font-size: 14px; color: var(--ink); }
+    .suggestion-desc { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .btn-location { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; box-shadow: 0 4px 12px rgba(102,126,234,0.3); width: 100%; padding: 12px 20px; border: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+    .btn-location:hover { transform: translateY(-2px); }
+    .btn-whatsapp { background: #25D366; color: white; width: 100%; padding: 12px 20px; border: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+    .btn-whatsapp:hover { background: #1da851; }
+    .result-box { background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 2px solid #10b981; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+    .result-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(16,185,129,0.15); }
+    .result-value { font-size: 16px; font-weight: 700; color: #065f46; }
+    .cost-value { font-size: 22px; font-weight: 700; color: #059669; }
+    .tariff-table { margin-top: 8px; }
+    .tariff-table h4 { font-size: 14px; color: var(--muted); margin-bottom: 10px; }
+    .tariff-table table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .tariff-table td { padding: 6px 0; border-bottom: 1px solid var(--line); }
+    .tariff-table .price { text-align: right; font-weight: 700; color: var(--accent); }
+    .map-panel { flex: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+    #map { flex: 1; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); z-index: 1; }
+    .map-controls { display: flex; gap: 10px; }
+    .map-controls .btn { flex: 1; padding: 12px 20px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; transition: all 0.2s; }
+    .btn-route { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+    .btn-route:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-reset { background: #e2e8f0; color: var(--ink); }
+    .btn-back { background: var(--accent); color: white; }
+    .btn-back:hover { background: #0868dc; }
+    @media (max-width: 900px) { .delivery-page { flex-direction: column; height: auto; } .delivery-info { width: 100%; min-width: 100%; } .map-panel { height: 500px; } #map { height: 100%; } }
+  </style>
+</head>
+<body>
+  <header class="topbar shell">
+    <div class="toolbar">
+      <a class="btn top-nav-btn" href="/index.html">← Назад в кассу</a>
+      <a class="btn top-nav-btn" href="/inventory.html">Склад</a>
+      <a class="btn top-nav-btn" href="/stock-receipt.html">Приход товара</a>
+      <a class="btn top-nav-btn" href="/journal.html">Журнал чеков</a>
+      <a class="btn top-nav-btn" href="/reports.html">Отчеты</a>
+      <a class="btn top-nav-btn" href="/debtors.html">Должники</a>
+      <a class="btn top-nav-btn" href="/delivery.html" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;">Доставка</a>
+    </div>
+  </header>
+  <main>
+    <div class="delivery-page">
+      <div class="delivery-info">
+        <div class="store-card">
+          <h2>МЕРОС Строймаркет</h2>
+          <p>Шымкент, ул. С. Сатыбалдиева, 43/1</p>
+          <p>+7 702 913 13 39</p>
+        </div>
+        <div class="delivery-card">
+          <h3>Расчет доставки</h3>
+          <div class="input-group">
+            <label>Введите адрес доставки</label>
+            <div class="address-input-wrapper">
+              <input type="text" id="address-input" placeholder="Шымкент, улица, дом..." autocomplete="off" />
+              <div id="suggestions" class="suggestions"></div>
+            </div>
+            <button class="btn-location" id="get-location-btn">Определить мое местоположение</button>
+          </div>
+          <div class="input-group">
+            <label>Или введите координаты</label>
+            <div style="display:flex;flex-direction:column;gap:6px;">
+              <input type="text" id="lat-input" placeholder="Широта (lat)" style="padding:10px 12px;border:2px solid var(--line);border-radius:10px;font-size:14px;outline:none;background:white;" />
+              <input type="text" id="lon-input" placeholder="Долгота (lon)" style="padding:10px 12px;border:2px solid var(--line);border-radius:10px;font-size:14px;outline:none;background:white;" />
+              <button id="find-by-coords-btn" style="padding:10px 16px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;">Найти</button>
+            </div>
+          </div>
+          <div class="result-box" id="result-box" style="display: none;">
+            <div class="result-row"><span>Расстояние:</span><span class="result-value" id="distance-value">0 км</span></div>
+            <div class="result-row"><span>Стоимость доставки:</span><span class="result-value cost-value" id="cost-value">0 KZT</span></div>
+            <div class="result-row"><span>Адрес:</span><span class="result-value" id="address-value">---</span></div>
+            <button class="btn-whatsapp" id="send-wa-btn" style="margin-top:12px;">Отправить в WhatsApp</button>
+          </div>
+          <div class="tariff-table">
+            <h4>Тарифы доставки</h4>
+            <table>
+              <tr><td>до 2 км</td><td class="price">1 000 KZT</td></tr>
+              <tr><td>2 - 2.5 км</td><td class="price">1 500 KZT</td></tr>
+              <tr><td>2.5 - 3 км</td><td class="price">2 000 KZT</td></tr>
+              <tr><td>3 - 4 км</td><td class="price">3 000 KZT</td></tr>
+              <tr><td>4 - 5 км</td><td class="price">4 000 KZT</td></tr>
+              <tr><td>5 - 10 км</td><td class="price">5 000 KZT</td></tr>
+              <tr><td>10 - 13 км</td><td class="price">6 000 KZT</td></tr>
+              <tr><td>13 - 15 км</td><td class="price">7 000 KZT</td></tr>
+              <tr><td>15 - 20 км</td><td class="price">8 000 KZT</td></tr>
+              <tr><td>> 20 км</td><td class="price">400 KZT/км</td></tr>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="map-panel">
+        <div id="map"></div>
+        <div class="map-controls">
+          <button class="btn btn-route" id="build-route-btn" disabled>Построить маршрут</button>
+          <button class="btn btn-reset" id="reset-route-btn" style="display:none;">Сбросить маршрут</button>
+        </div>
+      </div>
+    </div>
+  </main>
+  <script src="delivery.js"></script>
+</body>
+</html>
