@@ -1,4 +1,4 @@
-﻿const state = {
+const state = {
   products: [],
   cartSessions: [],
   activeCartId: null,
@@ -162,7 +162,9 @@ function saveSaleDraft() {
             price: Number(item.price),
             qty: Number(item.qty),
             unit: String(item.unit || "шт"),
-            priceOnly: Boolean(item.priceOnly)
+            priceOnly: Boolean(item.priceOnly),
+            orderImage: String(item.orderImage || ""),
+            orderTitle: String(item.orderTitle || "")
           }))
           .filter(
             (item) =>
@@ -232,7 +234,9 @@ function restoreSaleDraft() {
             price: Number(item?.price),
             qty: Number(item?.qty),
             unit: String(item?.unit || "шт"),
-            priceOnly: Boolean(item?.priceOnly)
+            priceOnly: Boolean(item?.priceOnly),
+            orderImage: String(item?.orderImage || ""),
+            orderTitle: String(item?.orderTitle || "")
           }))
           .filter(
             (item) =>
@@ -282,6 +286,91 @@ async function reserveSaleCodeForSession(session) {
   saveSaleDraft();
   return session.reservedSaleCode;
 }
+
+function isShtampProduct(product) {
+  return /штамп/i.test(String(product?.category || ""));
+}
+
+let pendingShtampProduct = null;
+
+function openShtampWindow(product) {
+  pendingShtampProduct = product || pendingShtampProduct;
+  const w = Math.min(900, Math.floor(screen.availWidth * 0.8));
+  const h = Math.floor(screen.availHeight * 0.9);
+  const left = Math.max(0, Math.floor((screen.availWidth - w) / 2));
+  const top = Math.max(0, Math.floor((screen.availHeight - h) / 2));
+  const win = window.open(
+    "/shtamp-list.html",
+    "shtampList",
+    `width=${w},height=${h},left=${left},top=${top},scrollbars=yes,resizable=yes`
+  );
+  if (!win) {
+    showToast("Не удалось открыть заказ листов (разрешите всплывающие окна)");
+    return;
+  }
+  win.focus();
+}
+
+const handledShtampOrders = new Set();
+
+function addShtampOrderToCart(order) {
+  const orderKey = String(order?.orderId || "");
+  if (orderKey) {
+    if (handledShtampOrders.has(orderKey)) return;
+    handledShtampOrders.add(orderKey);
+  }
+  const category = state.products.filter(isShtampProduct);
+  const product =
+    (pendingShtampProduct && state.products.find((p) => p.id === pendingShtampProduct.id)) ||
+    category[0];
+  if (!product) {
+    showToast("В кассе нет товаров категории ШТАМП ЛИСТ");
+    return;
+  }
+  const lines = Array.isArray(order?.items) ? order.items : [];
+  if (!lines.length) {
+    showToast("Пустой заказ листов");
+    return;
+  }
+  let totalPcs = 0;
+  lines.forEach((l) => {
+    const qty = Number(l.q) || 0;
+    if (qty <= 0) return;
+    totalPcs += qty;
+    const extra = [l.t ? String(l.t) : "", l.ref ? "РЕФ" : ""].filter(Boolean).join(" ");
+    state.cart.push({
+      rowId: `${product.id}-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+      productId: product.id,
+      name: `№${l.id}${extra ? ` ${extra}` : ""}`,
+      price: Number(product.price),
+      qty,
+      unit: product.unit || "шт",
+      priceOnly: false,
+      orderImage: "shtamp",
+      orderTitle: ""
+    });
+  });
+  renderCart();
+  showToast(`Заказ листов добавлен в корзину: ${lines.length} поз., ${totalPcs} шт`);
+  try {
+    window.focus();
+  } catch (_) {
+    // no-op
+  }
+}
+
+try {
+  const shtampChannel = new BroadcastChannel("kassa-shtamp");
+  shtampChannel.onmessage = (e) => {
+    if (e.data?.type === "shtamp-order") addShtampOrderToCart(e.data);
+  };
+} catch (_) {
+  // BroadcastChannel not supported
+}
+window.addEventListener("message", (e) => {
+  if (e.origin !== location.origin) return;
+  if (e.data?.type === "shtamp-order") addShtampOrderToCart(e.data);
+});
 
 function isDeliveryProduct(product) {
   const name = String(product?.name || "").trim().toLowerCase();
@@ -671,7 +760,13 @@ function renderProducts() {
     return;
   }
 
+  const shtampBanner =
+    !q && state.selectedCategory !== "all" && /штамп/i.test(state.selectedCategory) && list.some(isShtampProduct)
+    ? `<button type="button" class="btn primary" id="openShtampBtn" style="margin-bottom:8px">Открыть заказ листов</button>`
+    : "";
+
   productsList.innerHTML = `
+    ${shtampBanner}
     <div class="products-list">
       ${list
         .map(
@@ -690,6 +785,9 @@ function renderProducts() {
 
   document.querySelectorAll("[data-add]").forEach((btn) => {
     btn.addEventListener("click", () => addToCart(btn.dataset.add));
+  });
+  document.getElementById("openShtampBtn")?.addEventListener("click", () => {
+    openShtampWindow(list.find(isShtampProduct));
   });
 
   document.querySelectorAll("[data-row-add]").forEach((row) => {
@@ -868,6 +966,10 @@ function submitAddModal() {
 function addToCart(productId) {
   const product = state.products.find((p) => p.id === productId);
   if (!product) return;
+  if (isShtampProduct(product)) {
+    openShtampWindow(product);
+    return;
+  }
   openAddModal(product);
 }
 
@@ -1070,7 +1172,8 @@ async function checkout(paymentType = state.selectedPaymentType, options = {}) {
         items: cartItems.map((item) => ({
           productId: item.productId,
           qty: item.qty,
-          price: item.price
+          price: item.price,
+          label: item.orderImage ? item.name : ""
         }))
       })
     });

@@ -1,4 +1,4 @@
-﻿const express = require("express");
+const express = require("express");
 const fs = require("fs");
 const net = require("net");
 const path = require("path");
@@ -30,7 +30,7 @@ const DEFAULT_REMOTE_DEBT_BASE_URL =
   process.env.REMOTE_DEBT_BASE_URL || "https://debt-tracker-477415.lm.r.appspot.com";
 const REMOTE_DEBT_TIMEOUT_MS = Number(process.env.REMOTE_DEBT_TIMEOUT_MS || 12000);
 
-app.use(express.json({ limit: "10mb" }));
+app.use(express.json({ limit: "25mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
 if (!fs.existsSync(DATA_DIR)) {
@@ -1729,6 +1729,39 @@ app.post("/api/receipt/save-jpeg", async (req, res) => {
     res.json({ ok: true, path: targetPath, fileName: path.basename(targetPath) });
   } catch (err) {
     res.status(500).json({ error: err.message || "Не удалось сохранить JPEG" });
+  }
+});
+
+app.post("/api/shtamp-orders", async (req, res) => {
+  try {
+    const dataUrl = String(req.body?.dataUrl || "");
+    const m = dataUrl.match(/^data:image\/(png|jpeg);base64,(.+)$/);
+    if (!m) {
+      return res.status(400).json({ error: "Неверный формат изображения" });
+    }
+    const ext = m[1] === "jpeg" ? "jpg" : "png";
+    const checkDir = process.env.KASSA_CHECK_DIR
+      ? path.resolve(process.env.KASSA_CHECK_DIR)
+      : path.join(os.homedir(), "Desktop", "Чек");
+    await fs.promises.mkdir(checkDir, { recursive: true });
+
+    const now = new Date();
+    const p2 = (v) => String(v).padStart(2, "0");
+    const stamp = `${now.getFullYear()}-${p2(now.getMonth() + 1)}-${p2(now.getDate())} ${p2(now.getHours())}-${p2(now.getMinutes())}-${p2(now.getSeconds())}`;
+    const title = String(req.body?.title || "").trim();
+    const baseName = sanitizeFileName(`Заказ листов${title ? " " + title : ""} ${stamp}`);
+    let target = path.join(checkDir, `${baseName}.${ext}`);
+    let attempt = 1;
+    while (fs.existsSync(target)) {
+      attempt += 1;
+      target = path.join(checkDir, `${baseName}_${attempt}.${ext}`);
+    }
+    await fs.promises.writeFile(target, Buffer.from(m[2], "base64"));
+
+    const id = `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`;
+    res.status(201).json({ ok: true, id, savedPath: target });
+  } catch (err) {
+    res.status(500).json({ error: err.message || "Не удалось сохранить картинку заказа в папку Чек" });
   }
 });
 
@@ -3497,12 +3530,18 @@ app.post("/api/sales", async (req, res) => {
 
     for (const item of items) {
       const product = await get(
-        "SELECT id, sku, name, unit FROM products WHERE id = ?",
+        "SELECT id, sku, name, unit, category FROM products WHERE id = ?",
         [item.productId]
       );
 
       if (!product) {
         throw new Error(`Товар не найден: ${item.productId}`);
+      }
+
+      // Для категории ШТАМП ЛИСТ сохраняем номер листа в названии позиции (напр. "Штамп лист №048 0,6 РЕФ")
+      const shtampLabel = String(item.label || "").trim().slice(0, 80);
+      if (shtampLabel && /штамп/i.test(String(product.category || ""))) {
+        product.name = `${product.name} ${shtampLabel}`;
       }
 
       const qty = Number(item.qty);
